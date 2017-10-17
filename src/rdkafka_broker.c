@@ -3,24 +3,24 @@
  *
  * Copyright (c) 2012-2015, Magnus Edenhill
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met: 
- * 
+ * modification, are permitted provided that the following conditions are met:
+ *
  * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer. 
+ *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution. 
- * 
+ *    and/or other materials provided with the distribution.
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
@@ -340,7 +340,7 @@ int rd_kafka_broker_get_state (rd_kafka_broker_t *rkb) {
  *
  * \p level is the log level, <=LOG_INFO will be logged while =LOG_DEBUG will
  * be debug-logged.
- * 
+ *
  * Locality: Broker thread
  */
 void rd_kafka_broker_fail (rd_kafka_broker_t *rkb,
@@ -1198,7 +1198,7 @@ int rd_kafka_recv (rd_kafka_broker_t *rkb) {
 
 		if (unlikely(rkbuf->rkbuf_wof < RD_KAFKAP_RESHDR_SIZE)) {
 			/* Need response header for packet length and corrid.
-			 * Wait for more data. */ 
+			 * Wait for more data. */
 			return 0;
 		}
 
@@ -1870,7 +1870,7 @@ void rd_kafka_broker_buf_retry (rd_kafka_broker_t *rkb, rd_kafka_buf_t *rkbuf) {
 
 
 /**
- * Move buffers that have expired their retry backoff time from the 
+ * Move buffers that have expired their retry backoff time from the
  * retry queue to the outbuf.
  */
 static void rd_kafka_broker_retry_bufs_move (rd_kafka_broker_t *rkb) {
@@ -3333,7 +3333,7 @@ static void rd_kafka_broker_ua_idle (rd_kafka_broker_t *rkb, int timeout_ms) {
  * @param next_wakeup will be updated to when the next wake-up/attempt is
  *                    desired, only lower (sooner) values will be set.
  *
- * Locks: toppar_lock(rktp) MUST be held. 
+ * Locks: toppar_lock(rktp) MUST be held.
  * Returns the number of messages produced.
  */
 static int rd_kafka_toppar_producer_serve (rd_kafka_broker_t *rkb,
@@ -4654,7 +4654,7 @@ static int rd_kafka_broker_thread_main (void *arg) {
 	(void)rd_atomic32_add(&rd_kafka_thread_cnt_curr, 1);
 
         /* Our own refcount was increased just prior to thread creation,
-         * when refcount drops to 1 it is just us left and the broker 
+         * when refcount drops to 1 it is just us left and the broker
          * thread should terminate. */
 
 	/* Acquire lock (which was held by thread creator during creation)
@@ -4901,8 +4901,8 @@ rd_kafka_broker_t *rd_kafka_broker_add (rd_kafka_t *rk,
         rkb->rkb_port = port;
         rkb->rkb_origname = rd_strdup(name);
 
-	mtx_init(&rkb->rkb_lock, mtx_plain);
-        mtx_init(&rkb->rkb_logname_lock, mtx_plain);
+	if (unlikely(mtx_init(&rkb->rkb_lock, mtx_plain) != thrd_success)) goto err;
+        if (unlikely(mtx_init(&rkb->rkb_logname_lock, mtx_plain) != thrd_success)) goto err;
         rkb->rkb_logname = rd_strdup(rkb->rkb_name);
 	TAILQ_INIT(&rkb->rkb_toppars);
         CIRCLEQ_INIT(&rkb->rkb_fetch_toppars);
@@ -5053,6 +5053,12 @@ rd_kafka_broker_t *rd_kafka_broker_add (rd_kafka_t *rk,
 #endif
 
 	return rkb;
+
+err:
+	rd_kafka_log(rk, LOG_ERR, "BROKER", "Error initializing broker with Name %s and NodeId %"PRId32, name, nodeid);
+	rd_free(rkb);
+	return NULL;
+
 }
 
 /**
@@ -5079,7 +5085,10 @@ rd_kafka_broker_t *rd_kafka_broker_find_by_nodeid0 (rd_kafka_t *rk,
 
         if (state != -1) {
                 int broker_state;
-                rd_kafka_broker_lock(rkb);
+                if (unlikely(rd_kafka_broker_lock(rkb) != thrd_success)) {
+			rd_kafka_log(rk, LOG_ERR, "BROKER", "Could not lock broker with NodeId %"PRId32, nodeid);
+			return NULL;
+		}
                 broker_state = (int)rkb->rkb_state;
                 rd_kafka_broker_unlock(rkb);
 
@@ -5220,7 +5229,7 @@ static int rd_kafka_broker_name_parse (rd_kafka_t *rk,
 	}
 
 	/* Empty host name -> localhost */
-	if (!*s) 
+	if (!*s)
 		s = "localhost";
 
 	*host = s;
@@ -5269,7 +5278,7 @@ int rd_kafka_brokers_add0 (rd_kafka_t *rk, const char *brokerlist) {
 			cnt++;
 
 		/* If rd_kafka_broker_find returned a broker its
-		 * reference needs to be released 
+		 * reference needs to be released
 		 * See issue #193 */
 		if (rkb)
 			rd_kafka_broker_destroy(rkb);
