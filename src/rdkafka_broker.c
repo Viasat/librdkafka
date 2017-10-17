@@ -584,12 +584,17 @@ static void rd_kafka_broker_timeout_scan (rd_kafka_broker_t *rkb, rd_ts_t now) {
                                                     1000.0f));
                         else
                                 rttinfo[0] = 0;
-                        errno = ETIMEDOUT;
+			errno = ETIMEDOUT;
+			char timeoutinfo[32];
+			rd_snprintf(timeoutinfo, sizeof(timeoutinfo),
+				"(%d >= %d)",
+				rkb->rkb_req_timeouts,
+				rkb->rkb_rk->rk_conf.socket_max_fails);
                         rd_kafka_broker_fail(rkb, LOG_ERR,
                                              RD_KAFKA_RESP_ERR__MSG_TIMED_OUT,
                                              "%i request(s) timed out: "
-                                             "disconnect%s",
-                                             rkb->rkb_req_timeouts, rttinfo);
+                                             "disconnect%s%s",
+                                             rkb->rkb_req_timeouts, timeoutinfo, rttinfo);
                 }
         }
 }
