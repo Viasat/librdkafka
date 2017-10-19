@@ -1854,18 +1854,28 @@ void rd_kafka_broker_buf_retry (rd_kafka_broker_t *rkb, rd_kafka_buf_t *rkbuf) {
                 rko->rko_u.xbuf.rkbuf = rkbuf;
                 rd_kafka_q_enq(rkb->rkb_ops, rko);
                 return;
-        }
+	}
+
+	rd_ts_t now = rd_clock();
+	const char* timedout = "";
+	if (now >= rkbuf->rkbuf_ts_timeout) timedout = " timed out";
 
         rd_rkb_dbg(rkb, PROTOCOL, "RETRY",
-                   "Retrying %sRequest (v%hd, %"PRIusz" bytes, retry %d/%d)",
+                   "Retrying %sRequest (v%hd, %"PRIusz" bytes, retry %d/%d%s)",
                    rd_kafka_ApiKey2str(rkbuf->rkbuf_reqhdr.ApiKey),
                    rkbuf->rkbuf_reqhdr.ApiVersion, rkbuf->rkbuf_len,
-                   rkbuf->rkbuf_retries, rkb->rkb_rk->rk_conf.max_retries);
+		   rkbuf->rkbuf_retries, rkb->rkb_rk->rk_conf.max_retries,
+		   timedout);
 
 	rd_atomic64_add(&rkb->rkb_c.tx_retries, 1);
 
-	rkbuf->rkbuf_ts_retry = rd_clock() +
+
+	rkbuf->rkbuf_ts_retry = now +
 		(rkb->rkb_rk->rk_conf.retry_backoff_ms * 1000);
+
+	/* Reset timeout */
+	rkbuf->rkbuf_ts_timeout = now + (rkbuf->rkbuf_ts_timeout - rkbuf->rkbuf_ts_enq);
+
 	/* Reset send offset */
 	rkbuf->rkbuf_of = 0;
 	rkbuf->rkbuf_corrid = 0;
@@ -2855,7 +2865,7 @@ static int rd_kafka_broker_produce_toppar (rd_kafka_broker_t *rkb,
 
 	/* Update MessageSetSize */
 	rd_kafka_buf_update_i32(rkbuf, of_MessageSetSize, MessageSetSize);
-	
+
 	rd_atomic64_add(&rktp->rktp_c.tx_msgs,
 			rd_atomic32_get(&rkbuf->rkbuf_msgq.rkmq_msg_cnt));
 	rd_atomic64_add(&rktp->rktp_c.tx_bytes, MessageSetSize);
