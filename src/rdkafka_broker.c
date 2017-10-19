@@ -566,13 +566,12 @@ static void rd_kafka_broker_timeout_scan (rd_kafka_broker_t *rkb, rd_ts_t now) {
                 rkb->rkb_req_timeouts   += req_cnt + q_cnt;
                 rd_atomic64_add(&rkb->rkb_c.req_timeouts, req_cnt + q_cnt);
 
-		/* If this was an in-flight request that timed out, or
-		 * the other queues has reached the socket.max.fails threshold,
-		 * we need to take down the connection. */
-                if ((req_cnt > 0 ||
-		     (rkb->rkb_rk->rk_conf.socket_max_fails &&
+		/* If the number of timeouts has exceeded the
+		 * socket.max.fails threshold, we need to take
+		 * down the connection. */
+                if ((rkb->rkb_rk->rk_conf.socket_max_fails &&
 		      rkb->rkb_req_timeouts >=
-		      rkb->rkb_rk->rk_conf.socket_max_fails)) &&
+		      rkb->rkb_rk->rk_conf.socket_max_fails) &&
                     rkb->rkb_state >= RD_KAFKA_BROKER_STATE_UP) {
                         char rttinfo[32];
                         /* Print average RTT (if avail) to help diagnose. */
@@ -1868,7 +1867,6 @@ void rd_kafka_broker_buf_retry (rd_kafka_broker_t *rkb, rd_kafka_buf_t *rkbuf) {
 		   timedout);
 
 	rd_atomic64_add(&rkb->rkb_c.tx_retries, 1);
-
 
 	rkbuf->rkbuf_ts_retry = now +
 		(rkb->rkb_rk->rk_conf.retry_backoff_ms * 1000);
