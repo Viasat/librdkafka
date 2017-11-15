@@ -5097,36 +5097,24 @@ err:
  * @locks: rd_kafka_*lock() MUST be held
  * @remark caller must release rkb reference by rd_kafka_broker_destroy()
  */
-rd_kafka_broker_t *rd_kafka_broker_find_by_nodeid0 (rd_kafka_t *rk,
-                                                    int32_t nodeid,
-                                                    int state) {
-        rd_kafka_broker_t *rkb;
-        rd_kafka_broker_t skel = { .rkb_nodeid = nodeid };
+rd_kafka_broker_t *rd_kafka_broker_find_by_nodeid0(rd_kafka_t *rk,
+						   int32_t nodeid,
+						   int state) {
+	rd_kafka_broker_t *rkb;
 
-        if (rd_kafka_terminating(rk))
-                return NULL;
-
-        rkb = rd_list_find(&rk->rk_broker_by_id, &skel,
-                           rd_kafka_broker_cmp_by_id);
-
-        if (!rkb)
-                return NULL;
-
-        if (state != -1) {
-                int broker_state;
-                if (unlikely(rd_kafka_broker_lock(rkb) != thrd_success)) {
-			rd_kafka_log(rk, LOG_ERR, "BROKER", "Could not lock broker with NodeId %"PRId32, nodeid);
-			return NULL;
+	TAILQ_FOREACH(rkb, &rk->rk_brokers, rkb_link) {
+		rd_kafka_broker_lock(rkb);
+		if (!rd_atomic32_get(&rk->rk_terminate) &&
+		    rkb->rkb_nodeid == nodeid) {
+			if (state == -1 || state == (int) rkb->rkb_state) {
+				rd_kafka_broker_keep(rkb);
+				rd_kafka_broker_unlock(rkb);
+				return rkb;
+			}
 		}
-                broker_state = (int)rkb->rkb_state;
-                rd_kafka_broker_unlock(rkb);
-
-                if (broker_state != state)
-                        return NULL;
-        }
-
-        rd_kafka_broker_keep(rkb);
-        return rkb;
+		rd_kafka_broker_unlock(rkb);
+	}
+	return NULL;
 }
 
 /**
