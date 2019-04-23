@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2015 Magnus Edenhill
+ * Copyright (c) 2019 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,29 +26,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _RDKAFKA_SASL_H_
-#define _RDKAFKA_SASL_H_
+#ifndef _RDKAFKA_SASL_OAUTHBEARER_H_
+#define _RDKAFKA_SASL_OAUTHBEARER_H_
+
+void rd_kafka_oauthbearer_unsecured_token(rd_kafka_t *rk, void *opaque);
+
+rd_kafka_resp_err_t
+rd_kafka_oauthbearer_set_token0 (rd_kafka_t *rk,
+                                 const char *token_value,
+                                 int64_t md_lifetime_ms,
+                                 const char *md_principal_name,
+                                 const char **extensions,
+                                 size_t extension_size,
+                                 char *errstr, size_t errstr_size);
+
+rd_kafka_resp_err_t
+rd_kafka_oauthbearer_set_token_failure0 (rd_kafka_t *rk, const char *errstr);
+
+int unittest_sasl_oauthbearer (void);
 
 
-
-int rd_kafka_sasl_io_event (rd_kafka_transport_t *rktrans, int events,
-			    char *errstr, size_t errstr_size);
-void rd_kafka_sasl_close (rd_kafka_transport_t *rktrans);
-int rd_kafka_sasl_client_new (rd_kafka_transport_t *rktrans,
-			      char *errstr, size_t errstr_size);
-
-void rd_kafka_sasl_broker_term (rd_kafka_broker_t *rkb);
-void rd_kafka_sasl_broker_init (rd_kafka_broker_t *rkb);
-
-int rd_kafka_sasl_init (rd_kafka_t *rk, char *errstr, size_t errstr_size);
-void rd_kafka_sasl_term (rd_kafka_t *rk);
-
-rd_bool_t rd_kafka_sasl_ready (rd_kafka_t *rk);
-
-void rd_kafka_sasl_global_term (void);
-int rd_kafka_sasl_global_init (void);
-
-int rd_kafka_sasl_select_provider (rd_kafka_t *rk,
-                                   char *errstr, size_t errstr_size);
-
-#endif /* _RDKAFKA_SASL_H_ */
+#endif /* _RDKAFKA_SASL_OAUTHBEARER_H_ */

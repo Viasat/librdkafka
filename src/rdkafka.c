@@ -801,6 +801,10 @@ void rd_kafka_destroy_final (rd_kafka_t *rk) {
 
         rd_kafka_metadata_cache_destroy(rk);
 
+        /* Terminate SASL provider */
+        if (rk->rk_conf.sasl.provider)
+                rd_kafka_sasl_term(rk);
+
         rd_kafka_timers_destroy(&rk->rk_timers);
 
         rd_kafka_dbg(rk, GENERIC, "TERMINATE", "Destroying op queues");
@@ -1984,8 +1988,17 @@ rd_kafka_t *rd_kafka_new (rd_kafka_type_t type, rd_kafka_conf_t *app_conf,
 
         if (rk->rk_conf.security_protocol == RD_KAFKA_PROTO_SASL_SSL ||
             rk->rk_conf.security_protocol == RD_KAFKA_PROTO_SASL_PLAINTEXT) {
+                /* Select SASL provider */
                 if (rd_kafka_sasl_select_provider(rk,
                                                   errstr, errstr_size) == -1) {
+                        ret_err = RD_KAFKA_RESP_ERR__INVALID_ARG;
+                        ret_errno = EINVAL;
+                        goto fail;
+                }
+
+                /* Initialize SASL provider */
+                if (rd_kafka_sasl_init(rk, errstr, errstr_size) == -1) {
+                        rk->rk_conf.sasl.provider = NULL;
                         ret_err = RD_KAFKA_RESP_ERR__INVALID_ARG;
                         ret_errno = EINVAL;
                         goto fail;
@@ -2183,6 +2196,10 @@ fail:
          * Tell background thread to terminate and wait for it to return.
          */
         rd_atomic32_set(&rk->rk_terminate, RD_KAFKA_DESTROY_F_TERMINATE);
+
+        /* Terminate SASL provider */
+        if (rk->rk_conf.sasl.provider)
+                rd_kafka_sasl_term(rk);
 
         if (rk->rk_background.thread) {
                 int res;
