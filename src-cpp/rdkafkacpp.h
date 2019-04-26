@@ -512,6 +512,44 @@ class RD_EXPORT DeliveryReportCb {
 
 
 /**
+ * @brief SASL/OAUTHBEARER token refresh callback class
+ *
+ * The SASL/OAUTHBEARER token refresh callback is triggered via RdKafka::poll()
+ * whenever OAUTHBEARER is the SASL mechanism and a token needs to be retrieved,
+ * typically based on the configuration defined in \c sasl.oauthbearer.config.
+ *
+ * The \c oauthbearer_config argument is the value of the
+ * sasl.oauthbearer.config configuration property.
+ *
+ * The callback should invoke RdKafka::oauthbearer_set_token() or
+ * RdKafka::oauthbearer_set_token_failure() to indicate success or failure,
+ * respectively.
+ * 
+ * The refresh operation is eventable and may be received when an event
+ * callback handler is set with an event type of
+ * \c RdKafka::Event::EVENT_OAUTHBEARER_TOKEN_REFRESH.
+ *
+ * Note that before any SASL/OAUTHBEARER broker connection can succeed the
+ * application must call RdKafka::oauthbearer_set_token() once -- either
+ * directly or, more typically, by invoking RdKafka::poll() -- in order to
+ * cause retrieval of an initial token to occur.
+ *
+ * An application must call RdKafka::poll() at regular intervals to
+ * serve queued SASL/OAUTHBEARER token refresh callbacks (when
+ * OAUTHBEARER is the SASL mechanism).
+ */
+class RD_EXPORT OAuthBearerTokenRefreshCb {
+ public:
+  /**
+   * @brief SASL/OAUTHBEARER token refresh callback class.
+   */
+  virtual void oauthbearer_token_refresh_cb (const std::string &oauthbearer_config) = 0;
+
+  virtual ~OAuthBearerTokenRefreshCb() { }
+};
+
+
+/**
  * @brief Partitioner callback class
  *
  * Generic partitioner callback class for implementing custom partitioners.
