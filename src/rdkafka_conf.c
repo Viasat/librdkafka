@@ -695,7 +695,39 @@ static const struct rd_kafka_property rd_kafka_properties[] = {
 	{ _RK_GLOBAL|_RK_HIGH, "sasl.password", _RK_C_STR,
 	  _RK(sasl.password),
 	  "SASL password for use with the PLAIN and SASL-SCRAM-.. mechanism" },
-
+#if WITH_SASL_OAUTHBEARER
+        { _RK_GLOBAL, "sasl.oauthbearer.config", _RK_C_STR,
+          _RK(sasl.oauthbearer_config),
+          "SASL/OAUTHBEARER configuration. The format is "
+          "implementation-dependent and must be parsed accordingly. The "
+          "default unsecured token implementation (see "
+          "https://tools.ietf.org/html/rfc7515#appendix-A.5) recognizes "
+          "space-separated name=value pairs with valid names including "
+          "principalClaimName, principal, scopeClaimName, scope, and "
+          "lifeSeconds. The default value for principalClaimName is \"sub\", "
+          "the default value for scopeClaimName is \"scope\", and the default "
+          "value for lifeSeconds is 3600. The scope value is CSV format with "
+          "the default value being no/empty scope. For example: "
+          "`principalClaimName=azp principal=admin scopeClaimName=roles "
+          "scope=role1,role2 lifeSeconds=600`. In addition, SASL extensions "
+          "can be communicated to the broker via "
+          "`extension_<extensionname>=value`. For example: "
+          "`principal=admin extension_traceId=123`" },
+        { _RK_GLOBAL, "enable.sasl.oauthbearer.unsecure.jwt", _RK_C_BOOL,
+          _RK(sasl.enable_oauthbearer_unsecure_jwt),
+          "Enable the builtin unsecure JWT OAUTHBEARER token handler "
+          "if no oauthbearer_refresh_cb has been set. "
+          "This builtin handler should only be used for development "
+          "or testing, and not in production.",
+          0, 1, 0 },
+        { _RK_GLOBAL, "oauthbearer_token_refresh_cb", _RK_C_PTR,
+          _RK(sasl.oauthbearer_token_refresh_cb),
+          "SASL/OAUTHBEARER token refresh callback (set with "
+          "rd_kafka_conf_set_oauthbearer_token_refresh_cb(), triggered by "
+          "rd_kafka_poll(), et.al. "
+          "This callback will be triggered when it is time to refresh "
+          "the client's OAUTHBEARER token." },
+#endif
 #if WITH_PLUGINS
         /* Plugins */
         { _RK_GLOBAL, "plugin.library.paths", _RK_C_STR,
@@ -2897,6 +2929,13 @@ const char *rd_kafka_conf_finalize (rd_kafka_type_t cltype,
         if (conf->ssl.keystore_location && !conf->ssl.keystore_password)
                 return "`ssl.keystore.password` is mandatory when "
                         "`ssl.keystore.location` is set";
+#endif
+
+#if WITH_SASL_OAUTHBEARER
+        if (conf->sasl.enable_oauthbearer_unsecure_jwt &&
+            conf->sasl.oauthbearer_token_refresh_cb)
+                return "`enable.sasl.oauthbearer.unsecure.jwt` and "
+                        "`oauthbearer_token_refresh_cb` are mutually exclusive";
 #endif
 
         if (cltype == RD_KAFKA_CONSUMER) {

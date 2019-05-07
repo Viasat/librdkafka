@@ -76,6 +76,11 @@ def test_version (version, cmd=None, deploy=True, conf={}, debug=False, exec_cnt
                 os.write(fd, ('sasl.username=%s\n' % u).encode('ascii'))
                 os.write(fd, ('sasl.password=%s\n' % p).encode('ascii'))
                 break
+        elif mech == 'OAUTHBEARER':
+            security_protocol='SASL_PLAINTEXT'
+            os.write(fd, ('enable.sasl.oauthbearer.unsecure.jwt=true\n'))
+            os.write(fd, ('sasl.oauthbearer.config=%s\n' % \
+                          'scope=requiredScope principal=admin').encode('ascii'))
         else:
             print('# FIXME: SASL %s client config not written to %s' % (mech, test_conf_file))
 
