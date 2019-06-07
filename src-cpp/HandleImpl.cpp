@@ -242,6 +242,13 @@ void RdKafka::HandleImpl::set_common_config (RdKafka::ConfImpl *confimpl) {
     event_cb_ = confimpl->event_cb_;
   }
 
+  if (confimpl->oauthbearer_token_refresh_cb_) {
+    rd_kafka_conf_set_oauthbearer_token_refresh_cb(
+          confimpl->rk_conf_,
+          RdKafka::oauthbearer_token_refresh_cb_trampoline);
+      oauthbearer_token_refresh_cb_ = confimpl->oauthbearer_token_refresh_cb_;
+  }
+
   if (confimpl->socket_cb_) {
     rd_kafka_conf_set_socket_cb(confimpl->rk_conf_,
                                 RdKafka::socket_cb_trampoline);

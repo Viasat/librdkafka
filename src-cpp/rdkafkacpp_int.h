@@ -401,6 +401,7 @@ class ConfImpl : public Conf {
       partitioner_kp_cb_(NULL),
       rebalance_cb_(NULL),
       offset_commit_cb_(NULL),
+      oauthbearer_token_refresh_cb_(NULL),
       rk_conf_(NULL),
       rkt_conf_(NULL){}
   ~ConfImpl () {
@@ -427,6 +428,23 @@ class ConfImpl : public Conf {
     }
 
     dr_cb_ = dr_cb;
+    return Conf::CONF_OK;
+  }
+
+  Conf::ConfResult set (const std::string &name,
+                        OAuthBearerTokenRefreshCb *oauthbearer_token_refresh_cb,
+                        std::string &errstr) {
+    if (name != "oauthbearer_token_refresh_cb") {
+      errstr = "Invalid value type, expected RdKafka::OAuthBearerTokenRefreshCb";
+      return Conf::CONF_INVALID;
+    }
+
+    if (!rk_conf_) {
+      errstr = "Requires RdKafka::Conf::CONF_GLOBAL object";
+      return Conf::CONF_INVALID;
+    }
+
+    oauthbearer_token_refresh_cb_ = oauthbearer_token_refresh_cb;
     return Conf::CONF_OK;
   }
 
@@ -578,7 +596,8 @@ class ConfImpl : public Conf {
         name.compare("socket_cb") == 0 ||
         name.compare("open_cb") == 0 ||
         name.compare("rebalance_cb") == 0 ||
-        name.compare("offset_commit_cb") == 0 ) {
+        name.compare("offset_commit_cb") == 0 ||
+        name.compare("oauthbearer_token_refresh_cb") == 0 ) {
       return Conf::CONF_INVALID;
     }
     rd_kafka_conf_res_t res = RD_KAFKA_CONF_INVALID;
@@ -614,6 +633,14 @@ class ConfImpl : public Conf {
       if (!rk_conf_)
 	  return Conf::CONF_INVALID;
       dr_cb = this->dr_cb_;
+      return Conf::CONF_OK;
+  }
+
+  Conf::ConfResult get(
+    OAuthBearerTokenRefreshCb *&oauthbearer_token_refresh_cb) const {
+      if (!rk_conf_)
+          return Conf::CONF_INVALID;
+      oauthbearer_token_refresh_cb = this->oauthbearer_token_refresh_cb_;
       return Conf::CONF_OK;
   }
 
@@ -697,6 +724,7 @@ class ConfImpl : public Conf {
   PartitionerKeyPointerCb *partitioner_kp_cb_;
   RebalanceCb *rebalance_cb_;
   OffsetCommitCb *offset_commit_cb_;
+  OAuthBearerTokenRefreshCb *oauthbearer_token_refresh_cb_;
   ConfType conf_type_;
   rd_kafka_conf_t *rk_conf_;
   rd_kafka_topic_conf_t *rkt_conf_;
@@ -779,6 +807,39 @@ class HandleImpl : virtual public Handle {
           return rd_kafka_controllerid(rk_, timeout_ms);
   }
 
+  ErrorCode oauthbearer_set_token (const std::string &token_value,
+                                   int64_t md_lifetime_ms,
+                                   const std::string &md_principal_name,
+                                   const std::list<std::string> &extensions,
+                                   std::string &errstr) {
+          char errbuf[512];
+          ErrorCode err;
+          const char **extensions_copy = new const char *[extensions.size()];
+          int elem = 0;
+
+          for (std::list<std::string>::const_iterator it = extensions.begin();
+              it != extensions.end(); it++)
+                  extensions_copy[elem++] = it->c_str();
+          err = static_cast<ErrorCode>(rd_kafka_oauthbearer_set_token(
+                                               rk_, token_value.c_str(),
+                                               md_lifetime_ms,
+                                               md_principal_name.c_str(),
+                                               extensions_copy,
+                                               extensions.size(),
+                                               errbuf, sizeof(errbuf)));
+          free(extensions_copy);
+
+          if (err != ERR_NO_ERROR)
+              errstr = errbuf;
+
+          return err;
+  }
+
+  ErrorCode oauthbearer_set_token_failure(const std::string &errstr) {
+          return static_cast<ErrorCode>(rd_kafka_oauthbearer_set_token_failure(
+                                                rk_, errstr.c_str()));
+  };
+
   ErrorCode fatal_error (std::string &errstr) {
           char errbuf[512];
           RdKafka::ErrorCode err =
@@ -804,6 +865,7 @@ class HandleImpl : virtual public Handle {
   PartitionerKeyPointerCb *partitioner_kp_cb_;
   RebalanceCb *rebalance_cb_;
   OffsetCommitCb *offset_commit_cb_;
+  OAuthBearerTokenRefreshCb *oauthbearer_token_refresh_cb_;
 };
 
 
