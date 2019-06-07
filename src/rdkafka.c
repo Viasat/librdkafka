@@ -270,6 +270,7 @@ void rd_kafka_log0 (const rd_kafka_conf_t *conf,
         rd_kafka_log_buf(conf, rk, level, fac, buf);
 }
 
+rd_kafka_resp_err_t
 rd_kafka_oauthbearer_set_token (rd_kafka_t *rk,
                                 const char *token_value,
                                 int64_t md_lifetime_ms,
