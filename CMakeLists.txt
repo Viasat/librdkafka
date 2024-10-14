@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5)
 
 include("packaging/cmake/parseversion.cmake")
 parseversion("src/rdkafka.h")
 
 project(RdKafka VERSION ${RDKAFKA_VERSION})
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules/")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/packaging/cmake/Modules/")
 
 # Options. No 'RDKAFKA_' prefix to match old C++ code. {
 
@@ -16,7 +16,6 @@ option(WITHOUT_OPTIMIZATION "Disable optimization" OFF)
 
 option(ENABLE_DEVEL "Enable development asserts, checks, etc" OFF)
 option(ENABLE_REFCNT_DEBUG "Enable refcnt debugging" OFF)
-option(ENABLE_SHAREDPTR_DEBUG "Enable sharedptr debugging" OFF)
 set(TRYCOMPILE_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/packaging/cmake/try_compile")
 set(BUILT_WITH "CMAKE")
 
@@ -54,8 +53,21 @@ if(WITH_ZLIB)
 endif()
 # }
 
+# CURL {
+find_package(CURL QUIET)
+if(CURL_FOUND)
+  set(with_curl_default ON)
+else()
+  set(with_curl_default OFF)
+endif()
+option(WITH_CURL "With CURL" ${with_curl_default})
+if(WITH_CURL)
+  list(APPEND BUILT_WITH "CURL")
+endif()
+# }
+
 # ZSTD {
-find_package(Zstd QUIET)
+find_package(ZSTD QUIET)
 if(ZSTD_FOUND)
   set(with_zstd_default ON)
 else()
@@ -80,7 +92,7 @@ endif()
 # }
 
 # WITH_PLUGINS {
-if(WITH_LIBDL)
+if(WITH_LIBDL OR WIN32)
   set(with_plugins_default ON)
 else()
   set(with_plugins_default OFF)
@@ -134,6 +146,9 @@ else()
 endif()
 option(WITH_SASL "With SASL" ${with_sasl_default})
 if(WITH_SASL)
+  if(SASL_FOUND)
+    link_directories(${SASL_LIBRARY_DIRS})
+  endif()
   if(WITH_SSL)
     set(WITH_SASL_SCRAM ON)
     set(WITH_SASL_OAUTHBEARER ON)
@@ -145,6 +160,10 @@ if(WITH_SASL)
   endif()
 endif()
 # }
+
+if(WITH_SSL AND WITH_CURL)
+    set(WITH_OAUTHBEARER_OIDC ON)
+endif()
 
 # LZ4 {
 option(ENABLE_LZ4_EXT "Enable external LZ4 library support" ON)
@@ -176,6 +195,9 @@ endif(WIN32)
 # * HAVE_ATOMICS_64_SYNC
 # * HAVE_REGEX
 # * HAVE_STRNDUP
+# * HAVE_PTHREAD_SETNAME_GNU
+# * HAVE_PTHREAD_SETNAME_DARWIN
+# * HAVE_PTHREAD_SETNAME_FREEBSD
 # * WITH_C11THREADS
 # * WITH_CRC32C_HW
 # * LINK_ATOMIC
@@ -193,7 +215,6 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 # * WITHOUT_OPTIMIZATION
 # * ENABLE_DEVEL
 # * ENABLE_REFCNT_DEBUG
-# * ENABLE_SHAREDPTR_DEBUG
 # * HAVE_ATOMICS_32
 # * HAVE_ATOMICS_32_SYNC
 # * HAVE_ATOMICS_64
@@ -203,6 +224,9 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 # * WITH_SASL
 # * HAVE_REGEX
 # * HAVE_STRNDUP
+# * HAVE_PTHREAD_SETNAME_GNU
+# * HAVE_PTHREAD_SETNAME_DARWIN
+# * HAVE_PTHREAD_SETNAME_FREEBSD
 list(APPEND BUILT_WITH "SNAPPY")
 list(APPEND BUILT_WITH "SOCKEM")
 string(REPLACE ";" " " BUILT_WITH "${BUILT_WITH}")
@@ -212,7 +236,7 @@ configure_file("packaging/cmake/config.h.in" "${GENERATED_DIR}/config.h")
 
 include(GNUInstallDirs)
 
-set(config_install_dir "lib/cmake/${PROJECT_NAME}")
+set(config_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
 set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
@@ -253,8 +277,6 @@ install(
     FILES LICENSES.txt
     DESTINATION "share/licenses/librdkafka"
 )
-
-# }
 
 add_subdirectory(src)
 add_subdirectory(src-cpp)
